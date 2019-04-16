@@ -1,0 +1,8 @@
+configs/
+data_market/
+docker_build/
+nova/
+envs/
+*.log
+tmp/
+

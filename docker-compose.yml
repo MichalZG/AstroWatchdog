@@ -1,0 +1,53 @@
+version: '3'
+
+services:
+  # monitor:
+  #   build: ./monitor
+  #   ports:
+  #    - "8050:8050"
+  #   volumes:
+  #     - ./configs/monitor.conf:/etc/monitor/monitor.conf
+  #     - /home/pi/Programs/python_programs/AstroWatchdog/data_market:/data_market
+  #   env_file:
+  #     - './envs/env.monitor'
+  #   depends_on:
+  #     - influxdb
+  #     - redis
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    ports:
+      - "8083:8083"
+      - "8086:8086"
+      - "8090:8090"
+    env_file:
+      - './envs/env.influxdb'
+    volumes:
+      # Data persistency
+      # sudo mkdir -p /srv/docker/influxdb/data
+      - /srv/docker/influxdb/data:/var/lib/influxdb
+      - ./configs/influxdb.conf:/etc/influxdb/influxdb.conf
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    env_file:
+      - './envs/env.redis'
+    command: ["redis-server", "--appendonly", "yes"]
+    hostname: redis
+    restart: unless-stopped
+
+  nova:
+    image: michalzg/nova:latest
+    container_name: nova
+    ports:
+      - 8000:8000
+    volumes:
+      - ./nova/index:/usr/local/astrometry/data
+      - ./nova/data2:/data2/nova/
+      - /home/zielona/Programs/AstroWatchdog/data_market:/data_market
+    restart: unless-stopped
