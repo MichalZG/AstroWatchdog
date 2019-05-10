@@ -30,6 +30,9 @@ config.read('../configs/monitor.conf')
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
+
+
 app.title = 'AstroWatchdog'
 
 RANGE = [0, 1]
@@ -37,32 +40,54 @@ RANGE = [0, 1]
 img_width = 1400
 img_height = 1200
 scale_factor = 0.5
-
+"""
+html.H2('Object name', className='my-class', id='obj_name'),
+                html.H2('Image time', className='my-class alert', id='im_time'),
+                html.H2('Exptime', className='my-class', id='im_exptime'),
+                html.H2('Filter', className='my-class', id='im_filter')
+"""
 
 app.layout = html.Div([
     html.Div([
         html.Div([
             dcc.Graph(id='image', figure=[]),
-            ], className='six columns'),
+        ], className='five columns'),
             html.Div([
-                html.H2('Object name', className='my-class', id='obj_name'),
-                html.H2('Image time', className='my-class', id='im_time'),
-                html.H2('Exptime', className='my-class', id='im_exptime'),
-                html.H2('Filter', className='my-class', id='im_filter')
-            ])
+                html.Div([
+                    html.Div([
+                        html.Div([
+                            dcc.Graph(id='temp1'),
+                        ], className='row'),
+                        html.Div([
+                            dcc.Graph(id='temp2'),
+
+                        ], className='row'),
+                    ], className='six columns'),
+                    html.Div([
+                        html.H2('Object name', className='my-class', id='obj_name'),
+                        html.H2('Image time', className='my-class alert', id='im_time'),
+                        html.H2('Exptime', className='my-class', id='im_exptime'),
+                        html.H2('Filter', className='my-class', id='im_filter'),
+                        html.H2('Object name', className='my-class', id='obj_name1'),
+                        html.H2('Image time', className='my-class alert', id='im_time1'),
+                        html.H2('Exptime', className='my-class', id='im_exptime1'),
+                        html.H2('Filter', className='my-class', id='im_filter1')
+                    ], className='six columns'),
+                ], className='row')
+            ], className='seven columns')
     ], className='row'),
     html.Div([
         html.Div([
             dcc.Graph(id='snr_graph'),
-            ], className='six columns'),
+        ], className='six columns'),
         html.Div([
             dcc.Graph(id='peak_graph', figure=[]),
-            ], className='six columns'),
+        ], className='six columns'),
     ], className='row'),
 
     dcc.Interval(id='updater', interval=2000, n_intervals=0),
     html.Div(id='trigger', children=0, style={'display': 'none'}),
-    ])
+])
 
 
 @app.callback(Output('trigger', 'children'),
@@ -129,7 +154,9 @@ def update_image(_):
             layer="below",
             sizing="stretch",
             source='data:image/png;base64,{}'.format(encoded_image.decode()))
-        ]
+        ],
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)'
     )
 
     figure={'data': [],
@@ -174,7 +201,10 @@ def create_snr_figure(update, figure):
 
         figure = {
             'data': fig_data,
-            'layout': go.Layout(title='SNR')}
+            'layout': go.Layout(title='SNR',
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)'
+                                )}
 
     return figure
 
@@ -215,7 +245,9 @@ def create_peak_figure(update, figure):
 
         figure = {
             'data': fig_data,
-            'layout': go.Layout(title='PEAK')}
+            'layout': go.Layout(title='PEAK',
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                plot_bgcolor='rgba(0,0,0,0)')}
 
     return figure
 
@@ -256,10 +288,12 @@ def create_peak_figure(update, figure):
 #             'data': fig_data}
 
 #     return figure
-
+    
+app.css.append_css({
+        "external_url": "/static/main.css"})
 
 if __name__ == '__main__':
 
     influxdb_client = utils.get_influxdb_client()
     redis_client = utils.get_redis_client()
-    app.run_server(host="0.0.0.0", port=8050, debug=False, threaded=False)
+    app.run_server(host="0.0.0.0", port=8050, debug=True, threaded=False)
