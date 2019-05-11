@@ -49,5 +49,5 @@ services:
     volumes:
       - ./nova/index:/usr/local/astrometry/data
       - ./nova/data2:/data2/nova/
-      - /home/zielona/Programs/AstroWatchdog/data_market:/data_market
+      - /home/pi/Programs/python_programs/AstroWatchdog/data_market:/data_market
     restart: unless-stopped

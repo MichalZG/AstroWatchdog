@@ -1,5 +1,4 @@
 from influxdb import InfluxDBClient, DataFrameClient
-import redis
 import configparser 
 import logging
 import datetime as dt
@@ -31,15 +30,6 @@ def get_influxdb_client():
 
 
 @dump_func_name
-def get_redis_client():
-    redis_client = redis.Redis(host=config.get('REDIS', 'ADDRESS'),
-                               port=config.get('REDIS', 'PORT'),
-                               db=config.get('REDIS', 'DB_NAME'))
-
-    return redis_client
-
-
-@dump_func_name
 def get_influxdb_data(object_name, time_start):
 
     query_body = 'select * from image where time >= \'{}Z\' and OBJECT = \'{}\' \
@@ -61,3 +51,21 @@ def get_influxdb_data(object_name, time_start):
 
     return result
 
+
+@dump_func_name
+def get_last_influxdb_data():
+
+    query_body = 'select * from image order by desc limit 1'
+                  
+    client = DataFrameClient(
+        config.get('INFLUXDB', 'ADDRESS'),
+        config.get('INFLUXDB', 'PORT'),
+        config.get('INFLUXDB', 'USER'),
+        config.get('INFLUXDB', 'PASSWORD'),
+        config.get('INFLUXDB', 'DB_NAME'))
+
+    result = client.query(query_body)
+    logger.info('result: {}'.format(result))
+    result = dict([(k[1][0][1], v) for k, v in result.items()])
+
+    return result

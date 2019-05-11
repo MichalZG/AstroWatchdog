@@ -11,7 +11,7 @@ import aplpy
 import os
 import datetime as dt
 import time 
-
+import uuid
 
 
 logger = logging.getLogger(__name__)
@@ -177,10 +177,18 @@ class Image:
         
 
 @dump_func_name
-def prepare_data_for_influx(image):
+def prepare_data_for_influx(image, last_data):
 
     tags = {}
     fields = {}
+    image_object_name = image.image_data.header[config.get('FITS', 'OBJECT_KEY')]
+    if last_data.object_name != image_object_name:
+        uuid_val = int(uuid.uuid1())
+        last_data.uuid = uuid_val
+        last_data.object_name = image_object_name
+        tags['uuid'] = uuid_val
+    else:
+        tags['uuid'] = last_data.uuid
 
     for tag in config.get('INFLUXDB', 'HDR_KEYS_TO_DB_TAGS').split(','):
         tags[tag] = image.image_data.header[tag]
@@ -210,22 +218,12 @@ def prepare_data_for_influx(image):
 
     time = 'T'.join([date_time, hdr_time])
 
-
     message_body = {
             "measurement": "image",
             "tags": tags,
             "time": time,
             "fields": fields
             }
-
-    return message_body
-
-
-@dump_func_name
-def prepare_data_for_redis(image):
-    message_body = {}
-    for key in config.get('REDIS', 'HDR_KEYS_TO_SEND').split(','):
-        message_body[key] = image.image_data.header[key]
 
     return message_body
 
