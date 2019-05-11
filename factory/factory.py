@@ -14,6 +14,7 @@ from utils import Image
 from influxdb import InfluxDBClient
 import redis
 import pickle 
+import uuid 
 
 
 logging.basicConfig(
@@ -26,6 +27,12 @@ config.read('../configs/factory.conf')
 
 files_to_rm = ['*.axy', '*.corr', '*.xyls', '*.match',
                '*.new', '*.rdls', '*.solved', '*.wcs']
+
+
+class LastData:
+    def __init__(self):
+        self.object_name = None
+        self.uuid = int(uuid.uuid1())
 
 
 class MyObserver(Observer):
@@ -159,17 +166,20 @@ def run_astrometry(image, image_path):
 
 @utils.dump_func_name
 def send_data(image):
-    data_for_influx = utils.prepare_data_for_influx(image)
-    data_for_redis = utils.prepare_data_for_redis(image)
+    data_for_influx = utils.prepare_data_for_influx(image, last_data)
     data_for_modbus = utils.prepare_data_for_modbus(image)
 
     if influxdb_client.write_points([data_for_influx]):
-        print('influx success')        
-    data_for_redis = pickle.dumps(data_for_redis)
-    if redis_client.set('state_new', data_for_redis):
-        print('redis success')
+        print('influx success') 
+        signal_status = send_signal_to_monitor()       
         
     return True
+
+
+@utils.dump_func_name
+def send_signal_to_monitor():
+    print('signal')
+    pass
 
 
 @utils.dump_func_name
@@ -185,19 +195,10 @@ def get_influxdb_client():
     return influxdb_client
 
 
-@utils.dump_func_name
-def get_redis_client():
-    redis_client = redis.Redis(host=config.get('REDIS', 'ADDRESS'),
-                               port=config.get('REDIS', 'PORT'),
-                               db=config.get('REDIS', 'DB_NAME'))
-
-    return redis_client
-
-
 if __name__ == '__main__':
 
     influxdb_client = get_influxdb_client()
-    redis_client = get_redis_client()
+    last_data = LastData()
 
     observer = MyObserver()
     event_handler = Handler(
