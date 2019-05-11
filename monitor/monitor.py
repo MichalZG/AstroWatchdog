@@ -30,8 +30,6 @@ config.read('../configs/monitor.conf')
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
-
-
 app.title = 'AstroWatchdog'
 
 RANGE = [0, 1]
@@ -150,7 +148,7 @@ def update_image_info(data):
     image_datetime = dt_parser.parse(data['image_time'])
     image_time_str = image_datetime.time().strftime("%H:%M:%S")
     minutes_from_last = (
-        image_datetime - dt.datetime.now()).total_seconds() / 60.
+        image_datetime - dt.datetime.utcnow()).total_seconds() / 60.
 
     return (data['OBJECT'], image_time_str, data['EXPTIME'], data['FILTER'],
             int(minutes_from_last))
