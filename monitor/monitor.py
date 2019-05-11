@@ -8,7 +8,6 @@ import numpy as np
 import os
 import configparser 
 import datetime as dt
-from datetime import datetime as dt
 from datetime import timedelta
 import utils
 import random
@@ -17,7 +16,7 @@ import dateutil.parser as dt_parser
 from pprint import pprint as pp
 import base64
 import time 
-
+import uuid
 
 logging.basicConfig(
     filename='monitor.log',
@@ -54,28 +53,39 @@ app.layout = html.Div([
         ], className='five columns'),
             html.Div([
                 html.Div([
-                    # html.Div([
-                    #     html.Div([
-                    #         dcc.Graph(id='temp1'),
-                    #     ], className='row'),
-                    #     html.Div([
-                    #         dcc.Graph(id='temp2'),
-
-                    #     ], className='row'),
-                    # ], className='six columns'),
                     html.Div([
-                        html.H2('Object name', className='my-class'),
-                        dcc.Input(id='object_name', type='text',
-                            value='---'),
-                        html.H2('Image time', className='my-class alert'),
-                        dcc.Input(id='image_time', type='text',
-                            value='---'),
-                        html.H2('Exptime', className='my-class'),                        
-                        dcc.Input(id='image_exptime', type='text',
-                            value='---'),
-                        html.H2('Filter', className='my-class'),                        
-                        dcc.Input(id='image_filter', type='text',
-                            value='---'),
+                        html.H2('Number of points by filter', className='my-class'),
+                        dcc.Input(id='data_len_input', type='number', value=20),
+                        html.H2('Filter to show', className='my-class'),
+                        dcc.Input(id='data_filter', type='text', value=''),
+                    ], className='row'),
+
+                    html.Div([
+                        html.Div([
+                            html.H2('Object name', className='six columns'),
+                            html.H2('---', id='object_name_val',
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('Image time', className='six columns'),
+                            html.H2('---', id='image_time_val',
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('Exptime', className='six columns'),                        
+                            html.H2('---', id='image_exptime_val', 
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('Filter', className='six columns'),                        
+                            html.H2('---', id='image_filter_val', 
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('Minutes from last', className='six columns'),                        
+                            html.H2('---', id='time_from_last_val', 
+                                className='six columns'),
+                        ], className='row'),
                         html.Button('Refresh', id='refresh_button'),
                     ], className='six columns'),
                 ], className='row')
@@ -90,7 +100,11 @@ app.layout = html.Div([
         # ], className='six columns'),
     ], className='row'),
 
-    html.Div(id='trigger', children=0, style={'display': 'none'}),
+    dcc.Interval(
+            id='interval',
+            interval=60*1000),
+    html.Div(id='data_div', children=0, style={'display': 'none'}),
+    html.Div(id='test_data_div', children=0, style={'display': 'none'}),
 ])
 
 
@@ -112,33 +126,38 @@ app.layout = html.Div([
 #     return True
 
 
-@app.callback([Output('trigger', 'children')],
-              [Input('refresh_button', 'n_clicks_timestamp')])
+@app.callback([Output('data_div', 'children'),
+               Output('data_div', 'data-last'),
+               Output('data_div', 'data-main')],
+              [Input('refresh_button', 'n_clicks_timestamp'),
+               Input('interval', 'n_intervals')])
 @utils.dump_func_name
-def update(_):
-    return time.time()
+def update_data(_, __):
+    last_point, data = utils.get_influxdb_data(influxdb_client,
+                                               influxdb_df_client)
+
+    return time.time(), last_point, data
 
 
-@app.callback([Output('obj_name', 'children'),
-               Output('im_time', 'children'),
-               Output('im_exptime', 'children'),
-               Output('im_filter', 'children')],
-              [Input('trigger', 'children')])
+@app.callback([Output('object_name_val', 'children'),
+               Output('image_time_val', 'children'),
+               Output('image_exptime_val', 'children'),
+               Output('image_filter_val', 'children'),
+               Output('time_from_last_val', 'children')],
+              [Input('data_div', 'data-last')])
 @utils.dump_func_name
-def update_obj_name(_):
-    raw_state_new = redis_client.get('state_new')
-    state_new = pickle.loads(raw_state_new)
+def update_image_info(data):
+    image_datetime = dt_parser.parse(data['image_time'])
+    image_time_str = image_datetime.time().strftime("%H:%M:%S")
+    minutes_from_last = (
+        image_datetime - dt.datetime.now()).total_seconds() / 60.
 
-    obj_name_text = ' '.join(['Object name: ', state_new['OBJECT']])
-    im_time_text = ' '.join(['Image time: ', state_new['TIME-OBS']])
-    im_exptime = ' '.join(['Exptime: ', str(state_new['EXPTIME'])])
-    im_filter_text = ' '.join(['Filter: ', state_new['FILTER']])
-
-    return obj_name_text, im_time_text, im_exptime, im_filter_text
+    return (data['OBJECT'], image_time_str, data['EXPTIME'], data['FILTER'],
+            int(minutes_from_last))
 
 
 @app.callback(Output('image', 'figure'),
-             [Input('trigger', 'children')])
+             [Input('test_data_div', 'children')])
 @utils.dump_func_name
 def update_image(_):
 
@@ -178,7 +197,7 @@ def update_image(_):
 
 
 @app.callback(Output('snr_graph', 'figure'),
-             [Input('trigger', 'children')],
+             [Input('test_data_div', 'children')],
              [State('snr_graph', 'figure')])
 @utils.dump_func_name
 def create_snr_figure(update, figure):
@@ -219,9 +238,15 @@ def create_snr_figure(update, figure):
 
     return figure
 
-
+# @app.callback([Output('data_div', 'data-tmp')],
+#               [Input('object_name', 'value'),
+#                Input('image_time', 'value'),
+#                Input('image_exptime', 'value'),
+#                Input('image_filter', 'value')])
+# def test(a, b, c, d):
+#     pass
 # @app.callback(Output('peak_graph', 'figure'),
-#              [Input('trigger', 'children')],
+#              [Input('data_div', 'children')],
 #              [State('peak_graph', 'figure')])
 # @utils.dump_func_name
 # def create_peak_figure(update, figure):
@@ -264,7 +289,7 @@ def create_snr_figure(update, figure):
 
 
 # @app.callback(Output('fwhm_graph', 'figure'),
-#              [Input('trigger', 'children')],
+#              [Input('data', 'children')],
 #              [State('fwhm_graph', 'figure')])
 # @utils.dump_func_name
 # def create_fwhm_figure(update, figure):
@@ -305,5 +330,5 @@ app.css.append_css({
 
 if __name__ == '__main__':
 
-    influxdb_client = utils.get_influxdb_client()
+    influxdb_client, influxdb_df_client = utils.get_influxdb_clients()
     app.run_server(host="0.0.0.0", port=8050, debug=False, threaded=False)

@@ -182,6 +182,7 @@ def prepare_data_for_influx(image, last_data):
     tags = {}
     fields = {}
     image_object_name = image.image_data.header[config.get('FITS', 'OBJECT_KEY')]
+
     if last_data.object_name != image_object_name:
         uuid_val = int(uuid.uuid1())
         last_data.uuid = uuid_val
@@ -216,7 +217,10 @@ def prepare_data_for_influx(image, last_data):
     date_time = image.image_data.header[
         config.get('FITS', 'DATE_KEY')]    
 
-    time = 'T'.join([date_time, hdr_time])
+    image_time = 'T'.join([date_time, hdr_time])
+    fields['image_time'] = image_time
+
+    time = dt.datetime.now().isoformat()
 
     message_body = {
             "measurement": "image",
@@ -224,7 +228,7 @@ def prepare_data_for_influx(image, last_data):
             "time": time,
             "fields": fields
             }
-
+    print(message_body)
     return message_body
 
 
