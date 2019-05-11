@@ -17,6 +17,7 @@ from pprint import pprint as pp
 import base64
 import time 
 import uuid
+import pandas as pd
 
 logging.basicConfig(
     filename='monitor.log',
@@ -52,13 +53,6 @@ app.layout = html.Div([
             html.Div([
                 html.Div([
                     html.Div([
-                        html.H2('Number of points by filter', className='my-class'),
-                        dcc.Input(id='data_len_input', type='number', value=20),
-                        html.H2('Filter to show', className='my-class'),
-                        dcc.Input(id='data_filter', type='text', value=''),
-                    ], className='row'),
-
-                    html.Div([
                         html.Div([
                             html.H2('Object name', className='six columns'),
                             html.H2('---', id='object_name_val',
@@ -91,6 +85,18 @@ app.layout = html.Div([
     ], className='row'),
     html.Div([
         html.Div([
+            html.Div([
+                html.H2('Number of points by filter', className='six columns'),
+                html.H2('Filter to show', className='six columns'),
+            ], className='row'),
+            html.Div([
+                dcc.Input(id='data_len_input', type='number',
+                    value=20, className='six columns'),
+                dcc.Input(id='data_filter', type='text',
+                    value='', className='six columns'),
+            ], className='row'),
+        ], className='row'),
+        html.Div([
             dcc.Graph(id='snr_graph'),
         ], className='six columns'),
         # html.Div([
@@ -104,24 +110,6 @@ app.layout = html.Div([
     html.Div(id='data_div', children=0, style={'display': 'none'}),
     html.Div(id='test_data_div', children=0, style={'display': 'none'}),
 ])
-
-
-# @app.callback(Output('trigger', 'children'),
-#              [Input('updater', 'n_intervals'),
-#               Input('update_button', 'n_clicks_timestamp')])
-# @utils.dump_func_name
-# def update_state(_, _2):
-#     raw_state_new = redis_client.get('state_new')
-#     state_new = pickle.loads(raw_state_new)
-#     raw_state_old = redis_client.get('state_old')
-#     state_old = pickle.loads(redis_client.get('state_old'))
-#     print('state_old', state_old)
-#     print('state_new', state_new)
-#     if state_old == state_new:
-#         return False
-#     redis_client.set('state_old', raw_state_new)
-
-#     return True
 
 
 @app.callback([Output('data_div', 'children'),
@@ -155,7 +143,7 @@ def update_image_info(data):
 
 
 @app.callback(Output('image', 'figure'),
-             [Input('test_data_div', 'children')])
+             [Input('data_div', 'children')])
 @utils.dump_func_name
 def update_image(_):
 
@@ -195,33 +183,28 @@ def update_image(_):
 
 
 @app.callback(Output('snr_graph', 'figure'),
-             [Input('test_data_div', 'children')],
+             [Input('data_div', 'data-main')],
              [State('snr_graph', 'figure')])
 @utils.dump_func_name
-def create_snr_figure(update, figure):
-
-    redis_data = pickle.loads(redis_client.get('state_old'))
-
-    time_start = dt_parser.parse(
-        ' '.join([redis_data['DATE-OBS'],
-                  redis_data['TIME-OBS']])) - timedelta(hours=1)
-    object_name = redis_data['OBJECT']
-
-    data = utils.get_influxdb_data(object_name,
-        time_start.isoformat())
+def create_snr_figure(data, figure):
 
     fig_data = []
-    try:
-        visibilities = {
-            d.get('name'): d.get('visible') for d in figure['data']}
-    except TypeError:
-        visibilities = {}
+    # try:
+    #     visibilities = {
+    #         d.get('name'): d.get('visible') for d in figure['data']}
+    # except TypeError:
+    #     visibilities = {}
 
     for name, value in data.items():
-        value = value.dropna()
+        # index is first column not dt index
+        # FIXME
+        value = pd.read_json(value)
+        print(value)
+        x = value.image_time
+        y = value.SNR_WIN
         trace = go.Scatter(
-            x=value.index,
-            y=value['SNR_WIN'],
+            x=x,
+            y=y,
             name=name,
             # visible='legendonly',
             mode = 'lines+markers')
@@ -230,8 +213,8 @@ def create_snr_figure(update, figure):
     figure = {
         'data': fig_data,
         'layout': go.Layout(title='SNR',
-                            paper_bgcolor='rgba(0,0,0,0)',
-                            plot_bgcolor='rgba(0,0,0,0)'
+                            # paper_bgcolor='rgba(0,0,0,0)',
+                            # plot_bgcolor='rgba(0,0,0,0)'
                             )}
 
     return figure
