@@ -228,9 +228,8 @@ def prepare_data_for_influx(image, last_data):
             "time": time,
             "fields": fields
             }
-    print(message_body)
-    return message_body
 
+    return message_body
 
 @dump_func_name
 def prepare_data_for_modbus(image):

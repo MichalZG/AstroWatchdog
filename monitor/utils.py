@@ -3,6 +3,7 @@ import logging
 import datetime as dt
 from influxdb import InfluxDBClient, DataFrameClient
 import uuid
+from astropy.coordinates import SkyCoord
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,23 @@ def get_influxdb_data(client, df_client):
             level=0).to_json()) for k, v in result.items()])
 
     return last_result, result
+
+
+@dump_func_name
+def calculate_distance_from_center(data):
+
+    object_ra = data.get('RA_HDR', None)
+    object_dec = data.get('DEC_HDR', None)
+    center_ra = data.get('RA_CENTER', None)
+    center_dec = data.get('DEC_CENTER', None)
+
+    if not all([object_ra, object_dec, center_ra, center_dec]):
+        return 0
+
+    object_coo = SkyCoord(object_ra, object_dec, unit='deg')
+    center_coo = SkyCoord(center_ra, center_dec, unit='deg')
+
+    return object_coo.separation(center_coo).arcmin
 
 
 # @dump_func_name

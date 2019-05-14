@@ -54,6 +54,12 @@ app.layout = html.Div([
                 html.Div([
                     html.Div([
                         html.Div([
+                            html.Button('Refresh', id='refresh_button',
+                                        className='six columns'),
+                            dcc.Input(id='refresh_interval_input', type='number',
+                                      value=2, className='six columns'),
+                        ], className='row'),
+                        html.Div([
                             html.H2('Object name', className='six columns'),
                             html.H2('---', id='object_name_val',
                                 className='six columns'),
@@ -74,11 +80,30 @@ app.layout = html.Div([
                                 className='six columns'),
                         ], className='row'),
                         html.Div([
-                            html.H2('Minutes from last', className='six columns'),                        
+                            html.H2('Peak', className='six columns'),                        
+                            html.H2('---', id='object_peak_val', 
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('SNR', className='six columns'),                        
+                            html.H2('---', id='object_snr_val', 
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('FWHM', className='six columns'),                        
+                            html.H2('---', id='object_fwhm_val', 
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('Dist to center', className='six columns'),                        
+                            html.H2('---', id='object_center_dist_val', 
+                                className='six columns'),
+                        ], className='row'),
+                        html.Div([
+                            html.H2('Last [min]', className='six columns'),                        
                             html.H2('---', id='time_from_last_val', 
                                 className='six columns'),
                         ], className='row'),
-                        html.Button('Refresh', id='refresh_button'),
                     ], className='six columns'),
                 ], className='row')
             ], className='seven columns')
@@ -97,23 +122,37 @@ app.layout = html.Div([
             ], className='row'),
         ], className='row'),
         html.Div([
-            dcc.Graph(id='snr_graph'),
-        ], className='six columns'),
-        # html.Div([
-        #     dcc.Graph(id='peak_graph', figure=[]),
-        # ], className='six columns'),
+            html.Div([
+                dcc.Graph(id='snr_graph'),
+            ], className='six columns'),
+            html.Div([
+                dcc.Graph(id='peak_graph', figure=[]),
+            ], className='six columns'),
+        ], className='row'),
+    
+        html.Div([
+                dcc.Graph(id='xy_graph'),
+            ], className='six columns'),
+
     ], className='row'),
 
     dcc.Interval(
             id='interval',
-            interval=60*1000),
+            interval=10*1000),
     html.Div(id='data_div', children=0, style={'display': 'none'}),
     html.Div(id='test_data_div', children=0, style={'display': 'none'}),
 ])
 
+@app.callback([Output('interval', 'interval')],
+              [Input('refresh_button', 'n_clicks_timestamp'),
+               Input('refresh_interval_input', 'value')])
+@utils.dump_func_name
+def set_interval(_, interval_value):
+    print(interval_value)
+    return int(interval_value)
 
-@app.callback([Output('data_div', 'children'),
-               Output('data_div', 'data-last'),
+
+@app.callback([Output('data_div', 'data-last'),
                Output('data_div', 'data-main')],
               [Input('refresh_button', 'n_clicks_timestamp'),
                Input('interval', 'n_intervals')])
@@ -122,14 +161,19 @@ def update_data(_, __):
     last_point, data = utils.get_influxdb_data(influxdb_client,
                                                influxdb_df_client)
 
-    return time.time(), last_point, data
+    return last_point, data
 
 
 @app.callback([Output('object_name_val', 'children'),
                Output('image_time_val', 'children'),
                Output('image_exptime_val', 'children'),
                Output('image_filter_val', 'children'),
-               Output('time_from_last_val', 'children')],
+               Output('time_from_last_val', 'children'),
+               Output('object_peak_val', 'children'),
+               Output('object_snr_val', 'children'),
+               Output('object_fwhm_val', 'children'),
+               Output('object_center_dist_val', 'children'),
+               ],
               [Input('data_div', 'data-last')])
 @utils.dump_func_name
 def update_image_info(data):
@@ -137,13 +181,19 @@ def update_image_info(data):
     image_time_str = image_datetime.time().strftime("%H:%M:%S")
     minutes_from_last = (
         image_datetime - dt.datetime.utcnow()).total_seconds() / 60.
+    object_peak = data.get('FLUX_MAX', '?')
+    object_snr = data.get('SNR_WIN', '?')
+    object_fwhm = data.get('FWHM_IMAGE', '?')
+
+    object_center_dist = utils.calculate_distance_from_center(data)
 
     return (data['OBJECT'], image_time_str, data['EXPTIME'], data['FILTER'],
-            int(minutes_from_last))
+            int(minutes_from_last), int(object_peak), object_snr, object_fwhm,
+            int(object_center_dist))
 
 
 @app.callback(Output('image', 'figure'),
-             [Input('data_div', 'children')])
+             [Input('data_div', 'data-main')])
 @utils.dump_func_name
 def update_image(_):
 
@@ -189,26 +239,19 @@ def update_image(_):
 def create_snr_figure(data, figure):
 
     fig_data = []
-    # try:
-    #     visibilities = {
-    #         d.get('name'): d.get('visible') for d in figure['data']}
-    # except TypeError:
-    #     visibilities = {}
 
     for name, value in data.items():
-        # index is first column not dt index
-        # FIXME
         value = pd.read_json(value)
-        print(value)
-        x = value.image_time
-        y = value.SNR_WIN
-        trace = go.Scatter(
-            x=x,
-            y=y,
-            name=name,
-            # visible='legendonly',
-            mode = 'lines+markers')
-        fig_data.append(trace)
+        if 'SNR_WIN' in value:
+            x = value.image_time
+            y = value['SNR_WIN']
+            trace = go.Scatter(
+                x=x,
+                y=y,
+                name=name,
+                # visible='legendonly',
+                mode = 'lines+markers')
+            fig_data.append(trace)
 
     figure = {
         'data': fig_data,
@@ -219,92 +262,70 @@ def create_snr_figure(data, figure):
 
     return figure
 
-# @app.callback([Output('data_div', 'data-tmp')],
-#               [Input('object_name', 'value'),
-#                Input('image_time', 'value'),
-#                Input('image_exptime', 'value'),
-#                Input('image_filter', 'value')])
-# def test(a, b, c, d):
-#     pass
-# @app.callback(Output('peak_graph', 'figure'),
-#              [Input('data_div', 'children')],
-#              [State('peak_graph', 'figure')])
-# @utils.dump_func_name
-# def create_peak_figure(update, figure):
 
-#     if True:
-#         redis_data = pickle.loads(redis_client.get('state_old'))
+@app.callback(Output('peak_graph', 'figure'),
+             [Input('data_div', 'data-main')],
+             [State('peak_graph', 'figure')])
+@utils.dump_func_name
+def create_peak_figure(data, figure):
 
-#         time_start = dt_parser.parse(
-#             ' '.join([redis_data['DATE-OBS'],
-#                       redis_data['TIME-OBS']])) - timedelta(hours=1)
-#         object_name = redis_data['OBJECT']
+    fig_data = []
 
-#         data = utils.get_influxdb_data(object_name,
-#             time_start.isoformat())
+    for name, value in data.items():
+        value = pd.read_json(value)
+        if 'FLUX_MAX' in value:
+            x = value.image_time
+            y = value['FLUX_MAX']
+            trace = go.Scatter(
+                x=x,
+                y=y,
+                name=name,
+                # visible='legendonly',
+                mode = 'lines+markers')
+            fig_data.append(trace)
 
-#         fig_data = []
-#         try:
-#             visibilities = {
-#                 d.get('name'): d.get('visible') for d in figure['data']}
-#         except TypeError:
-#             visibilities = {}
+    figure = {
+        'data': fig_data,
+        'layout': go.Layout(title='PEAK',
+                            # paper_bgcolor='rgba(0,0,0,0)',
+                            # plot_bgcolor='rgba(0,0,0,0)'
+                            )}
 
-#         for name, value in data.items():
-#             value = value.dropna()
-#             trace = go.Scatter(
-#                 x=value.index,
-#                 y=value['FLUX_MAX'],
-#                 name=name,
-#                 # visible='legendonly',
-#                 mode = 'lines+markers')
-#             fig_data.append(trace)
-
-#         figure = {
-#             'data': fig_data,
-#             'layout': go.Layout(title='PEAK',
-#                                 paper_bgcolor='rgba(0,0,0,0)',
-#                                 plot_bgcolor='rgba(0,0,0,0)')}
-
-#     return figure
+    return figure
 
 
-# @app.callback(Output('fwhm_graph', 'figure'),
-#              [Input('data', 'children')],
-#              [State('fwhm_graph', 'figure')])
-# @utils.dump_func_name
-# def create_fwhm_figure(update, figure):
-#     if update:
-#         redis_data = pickle.loads(redis_client.get('state_old'))
-#         print(redis_data)
-#         time_start = dt_parser.parse(
-#             ' '.join([redis_data['DATE-OBS'],
-#                       redis_data['TIME-OBS']])) - timedelta(hours=12)
-#         object_name = redis_data['OBJECT']
+@app.callback(Output('xy_graph', 'figure'),
+             [Input('data_div', 'data-main')],
+             [State('xy_graph', 'figure')])
+@utils.dump_func_name
+def create_peak_figure(data, figure):
 
-#         data = utils.get_influxdb_data(object_name,
-#             time_start.isoformat())
+    fig_data = []
 
-#         fig_data = []
-#         try:
-#             visibilities = {d.get('name'): d.get(
-#                 'visible') for d in figure['data']}
-#         except TypeError:
-#             visibilities = {}
+    for name, value in data.items():
+        value = pd.read_json(value)
+        if 'X_IMAGE' in value and 'Y_IMAGE' in value:
+            x = value['X_IMAGE']
+            y = value['Y_IMAGE']
+            trace = go.Scatter(
+                x=x,
+                y=y,
+                name=name,
+                # visible='legendonly',
+                mode = 'lines+markers')
+            fig_data.append(trace)
 
-#         for name, value in data.items():
-#             trace = go.Scatter(
-#                 x=value.index,
-#                 y=value['FWHM_IMAGE'],
-#                 name=name,
-#                 visible=visibilities.get(name) or 'legendonly',
-#                 mode = 'lines+markers')
-#             fig_data.append(trace)
+    figure = {
+        'data': fig_data,
+        'layout': go.Layout(title='PEAK',
+                            width=400,
+                            height=400,
+                            # paper_bgcolor='rgba(0,0,0,0)',
+                            # plot_bgcolor='rgba(0,0,0,0)'
+                            )}
 
-#         figure = {
-#             'data': fig_data}
+    return figure
 
-#     return figure
     
 app.css.append_css({
         "external_url": "/static/main.css"})
