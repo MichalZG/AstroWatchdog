@@ -96,6 +96,7 @@ class Handler(PatternMatchingEventHandler):
 def run_sextractor(image_path):
     logger.info('SEXTRACTOR: start')
     image_base_name = os.path.basename(image_path)
+    logger.info('sex image: {}'.format(image_path))
     solve_field_command = ['docker', 'run',
                            '-v', config.get(
                                 'MAIN', 'DIRECTORY_TO_WATCH') + ':/data',
@@ -104,7 +105,7 @@ def run_sextractor(image_path):
                             'sextractor', 'sex',
                             '/data/' + image_base_name,
                             '-c', '/configs/sex.conf',
-                            '-CATALOG_NAME', '/data/' + image_base_name + '.cat'
+                            '-CATALOG_NAME', '/data/' + image_base_name + '.cat',
                            ]
 
     res = sub.Popen(solve_field_command, stdout=sub.PIPE,

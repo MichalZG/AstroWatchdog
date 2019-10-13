@@ -7,6 +7,7 @@ from astropy.wcs import WCS
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 import aplpy
 import os
 import datetime as dt
@@ -78,7 +79,7 @@ class Image:
 
     @dump_func_name
     def draw_image(self):
-
+        
         if not self.wcs_image_data:
             fig = aplpy.FITSFigure(data=self.image_data)
         else:    
@@ -90,22 +91,30 @@ class Image:
                  np.array([self.coo_center.ra.deg,
                            self.coo_center.dec.deg])]).T
 
-            fig.show_lines([plot_points], color='red', linewidth=1, alpha=1)
+            fig.show_lines([plot_points], color='red', linewidth=2, alpha=1)
             fig.show_markers(
                 self.coo_target_hdr.ra.deg,
                 self.coo_target_hdr.dec.deg,
                 layer='marker_set_1', edgecolor='red',
                 facecolor='none', marker='o', s=100, alpha=1)
+            fig.add_label(0.21, 0.05,
+                "Dist to object: {:.1f}\"".format(
+                    self.coo_center.separation(
+                            self.coo_target_hdr).arcmin),
+                            color='red', size='xx-large', relative=True)
             if self.target_measurements:
                 fig.show_markers(self.coo_target_image.ra.deg,
                                  self.coo_target_image.dec.deg,
                                  layer='marker_set_2', edgecolor='green',
                                  facecolor='none', marker='o', s=100, alpha=1)
 
-        fig.set_theme('publication')
+        fig.set_theme('pretty')
         fig.show_grayscale()
+        plt.axis('off')
+        plt.tight_layout(pad=0., w_pad=0., h_pad=0.)
         fig.save(os.path.join(
-            config.get('MAIN', 'DIRECTORY_TO_SAVE'), 'main_plot.png'))
+            config.get('MAIN', 'DIRECTORY_TO_SAVE'), 'main_plot.png'), transparent=True,
+                       adjust_bbox=False)
         fig.close()
 
         return True
@@ -124,9 +133,10 @@ class Image:
             self.wcs_image_data.header).wcs_world2pix(
             self.coo_target_hdr.ra.deg, self.coo_target_hdr.dec.deg, 1)
         logger.info('target: {}, {}'.format(target_hdr_x, target_hdr_y))
-
+        
         if (self.wcs_image_data.header['NAXIS1'] < target_hdr_x < 0 or
             self.wcs_image_data.header['NAXIS2'] < target_hdr_y < 0):
+            logger.info('Sextractor False')
             return False
 
         counterpart_idx, dist = closest_object(
@@ -150,6 +160,7 @@ class Image:
             self.target_measurements[key] = self.sextractor_data[
                                                     key][counterpart_idx]
 
+        logger.info('Sextractor True')
         return True
     
 
@@ -182,7 +193,8 @@ def prepare_data_for_influx(image, last_data):
     tags = {}
     fields = {}
     image_object_name = image.image_data.header[config.get('FITS', 'OBJECT_KEY')]
-
+    
+    logger.info('Last data: {}, {}'.format(last_data.object_name, last_data.uuid))
     if last_data.object_name != image_object_name:
         uuid_val = int(uuid.uuid1())
         last_data.uuid = uuid_val
@@ -196,13 +208,16 @@ def prepare_data_for_influx(image, last_data):
 
     for field in config.get('INFLUXDB', 'HDR_KEYS_TO_DB_FIELDS').split(','):
         fields[field] = image.image_data.header[field]
-
     if image.target_measurements:
         for key, value in image.target_measurements.items():
-            fields[key] = value
+            logger.info('{}: {}'.format(key, value))
+            #fields[key] = value
+        # FIXME problem here, no data if status = 1
+        fields['SNR_WIN'] = int(image.target_measurements['SNR_WIN'])
         fields['PHOTOMETRY_STATUS'] = 1
     else:
         fields['PHOTOMETRY_STATUS'] = 0
+        fields['SNR_WIN'] = 0
 
     fields['RA_HDR'] = round(image.coo_target_hdr.ra.deg, 6)
     fields['DEC_HDR'] = round(image.coo_target_hdr.dec.deg, 6)
@@ -221,14 +236,15 @@ def prepare_data_for_influx(image, last_data):
     fields['image_time'] = image_time
 
     time = dt.datetime.now().isoformat()
-
+    
+    logger.info('fields: {}'.format(fields))
     message_body = {
             "measurement": "image",
             "tags": tags,
             "time": time,
             "fields": fields
             }
-    print(message_body)
+    logger.info('message body: {}'.format(message_body))
     return message_body
 
 
@@ -240,7 +256,7 @@ def prepare_data_for_modbus(image):
 @dump_func_name
 def closest_object(node, nodes):
     nodes = np.asarray(nodes)
-    dist_2 = np.sum((nodes - node)**2, axis=1)
+    dist_2 = np.sqrt(np.sum((nodes - node)**2, axis=1))
 
     return np.argmin(dist_2), dist_2[np.argmin(dist_2)]
 

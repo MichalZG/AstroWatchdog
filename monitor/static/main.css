@@ -13,3 +13,78 @@
 
 
 */
+
+._dash-undo-redo {
+    display: none;
+}
+
+.main {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+    grid-auto-rows: minmax(100px, auto);
+}
+
+.figure {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.data {
+    grid-column: 1;
+    grid-row: 2;
+    grid-template-columns: repeat(3, 1fr);
+    grid-gap: 10px;
+    grid-auto-rows: minmax(10px, auto);
+    display: inline-grid;
+    color: greenyellow;
+}
+
+.on_label {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.on_val {
+    grid-column: 2;
+    grid-row: 1;
+}
+
+.graph_1_box {
+    grid-column: 2;
+    grid-row: 1;
+    grid-template-columns: repeat(5, 1fr);
+    grid-gap: 50px;
+    grid-auto-rows: minmax(10px, auto);
+    display: inline-block;
+}
+
+.npf_label {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.npf_val {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+.fts_label {
+    grid-column: 3;
+    grid-row: 2;
+}
+
+.fts_val {
+    grid-column: 4;
+    grid-row: 2;
+}
+
+.refresh_button {
+    grid-column: 1;
+    grid-row: 3;
+}
+
+.snr_graph {
+    grid-column: 1/5;
+    grid-row: 1;
+}

@@ -47,17 +47,17 @@ def get_influxdb_data(client, df_client):
     last_uuid = last_result['uuid']
     
     data_query = 'select * from image where uuid = \'{}\' group by "FILTER" \
-                  order by asc'.format(last_uuid)
+                  order by desc'.format(last_uuid)
     
-    data_query = 'select * from image group by "FILTER" order by asc limit 100'.format(
-                     uuid
-                    )
+    #data_query = 'select * from image group by "FILTER" order by asc limit 100'.format(
+    #                 uuid
+    #                )
 
     result = df_client.query(data_query)
     result = dict(
         [(k[1][0][1], v.reset_index(
             level=0).to_json()) for k, v in result.items()])
-
+    logger.info('influx result: {}'.format(result))
     return last_result, result
 
 

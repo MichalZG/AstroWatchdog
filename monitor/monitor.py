@@ -49,67 +49,52 @@ app.layout = html.Div([
     html.Div([
         html.Div([
             dcc.Graph(id='image', figure=[]),
-        ], className='five columns'),
+        ], className='figure'),
             html.Div([
                 html.Div([
-                    html.Div([
-                        html.Div([
-                            html.H2('Object name', className='six columns'),
-                            html.H2('---', id='object_name_val',
-                                className='six columns'),
-                        ], className='row'),
-                        html.Div([
-                            html.H2('Image time', className='six columns'),
-                            html.H2('---', id='image_time_val',
-                                className='six columns'),
-                        ], className='row'),
-                        html.Div([
-                            html.H2('Exptime', className='six columns'),                        
-                            html.H2('---', id='image_exptime_val', 
-                                className='six columns'),
-                        ], className='row'),
-                        html.Div([
-                            html.H2('Filter', className='six columns'),                        
-                            html.H2('---', id='image_filter_val', 
-                                className='six columns'),
-                        ], className='row'),
-                        html.Div([
-                            html.H2('Minutes from last', className='six columns'),                        
-                            html.H2('---', id='time_from_last_val', 
-                                className='six columns'),
-                        ], className='row'),
-                        html.Button('Refresh', id='refresh_button'),
-                    ], className='six columns'),
-                ], className='row')
-            ], className='seven columns')
-    ], className='row'),
+                    html.H3('Object name'),
+                    html.H3('---', id='object_name_val'),
+                ],),
+                html.Div([
+                    html.H3('Image time '),
+                    html.H3('---', id='image_time_val'),
+                ], className='it'),
+                html.Div([
+                    html.H3('Exptime '),                        
+                    html.H3('---', id='image_exptime_val'),
+                ], className='et'),
+                html.Div([
+                    html.H3('Filter'),                        
+                    html.H3('---', id='image_filter_val', 
+                        ),
+                ],),
+                html.Div([
+                    html.H3('Last data [min]',),                        
+                    html.H3('---', id='time_from_last_val'),
+                ]),
+            ], className='data')
+    ]),
     html.Div([
+        dcc.Graph(id='snr_graph', className='snr_graph'),
         html.Div([
-            html.Div([
-                html.H2('Number of points by filter', className='six columns'),
-                html.H2('Filter to show', className='six columns'),
-            ], className='row'),
-            html.Div([
+                html.H6('No', className='npf_label'),
                 dcc.Input(id='data_len_input', type='number',
-                    value=20, className='six columns'),
-                dcc.Input(id='data_filter', type='text',
-                    value='', className='six columns'),
-            ], className='row'),
-        ], className='row'),
+                    value=20, className='npf_val'),
+        ]),
         html.Div([
-            dcc.Graph(id='snr_graph'),
-        ], className='six columns'),
-        # html.Div([
-        #     dcc.Graph(id='peak_graph', figure=[]),
-        # ], className='six columns'),
-    ], className='row'),
-
+                html.H6('Filter', className='fts_label'),
+                dcc.Input(id='data_filter', type='text',
+                    value='', className='fts_val'),
+        ]),
+        html.Button('Refresh', id='refresh_button',
+                            className='refresh_button'),
+    ], className='graph_1_box'),
     dcc.Interval(
             id='interval',
-            interval=60*1000),
+            interval=5*1000),
     html.Div(id='data_div', children=0, style={'display': 'none'}),
     html.Div(id='test_data_div', children=0, style={'display': 'none'}),
-])
+], style={'backgroundColor': 'black'}, className='main')
 
 
 @app.callback([Output('data_div', 'children'),
@@ -129,7 +114,8 @@ def update_data(_, __):
                Output('image_time_val', 'children'),
                Output('image_exptime_val', 'children'),
                Output('image_filter_val', 'children'),
-               Output('time_from_last_val', 'children')],
+               Output('time_from_last_val', 'children'),
+               Output('time_from_last_val', 'style')],
               [Input('data_div', 'data-last')])
 @utils.dump_func_name
 def update_image_info(data):
@@ -138,8 +124,13 @@ def update_image_info(data):
     minutes_from_last = (
         image_datetime - dt.datetime.utcnow()).total_seconds() / 60.
 
+    if minutes_from_last < -5:
+        time_from_last_val_style = {'color': 'red'}
+    else:
+        time_from_last_val_style = {}
+
     return (data['OBJECT'], image_time_str, data['EXPTIME'], data['FILTER'],
-            int(minutes_from_last))
+            int(minutes_from_last), time_from_last_val_style)
 
 
 @app.callback(Output('image', 'figure'),
@@ -151,11 +142,12 @@ def update_image(_):
         open('./assets/main_plot.png', 'rb').read())
 
     layout = go.Layout(
-        xaxis = go.layout.XAxis(visible = False,
-            range = [0, img_width*scale_factor]),
+        xaxis = go.layout.XAxis(
+            visible = False,
+            range = [10, img_width*scale_factor]),
         yaxis = go.layout.YAxis(
             visible=False,
-            range = [0, img_height*scale_factor],
+            range = [10, img_height*scale_factor],
             scaleanchor = 'x'),
         width = img_width*scale_factor,
         height = img_height*scale_factor,
@@ -172,7 +164,7 @@ def update_image(_):
             sizing="stretch",
             source='data:image/png;base64,{}'.format(encoded_image.decode()))
         ],
-        paper_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,20,20,20)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
 
@@ -199,7 +191,10 @@ def create_snr_figure(data, figure):
         # index is first column not dt index
         # FIXME
         value = pd.read_json(value)
-        print(value)
+        value = value.sort_values(by='image_time')
+        value = value.tail(50)
+        logger.info(value)
+        logger.info('snr_graph value: {}'.format(value['SNR_WIN']))
         x = value.image_time
         y = value.SNR_WIN
         trace = go.Scatter(
@@ -213,8 +208,8 @@ def create_snr_figure(data, figure):
     figure = {
         'data': fig_data,
         'layout': go.Layout(title='SNR',
-                            # paper_bgcolor='rgba(0,0,0,0)',
-                            # plot_bgcolor='rgba(0,0,0,0)'
+                            paper_bgcolor='rgba(120,120,120,120)',
+                            plot_bgcolor='rgba(80,80,80,80)'
                             )}
 
     return figure
