@@ -57,7 +57,7 @@ def get_influxdb_data(client, df_client):
     result = dict(
         [(k[1][0][1], v.reset_index(
             level=0).to_json()) for k, v in result.items()])
-    logger.info('influx result: {}'.format(result))
+    # logger.info('influx result: {}'.format(result))
     return last_result, result
 
 

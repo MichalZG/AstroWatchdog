@@ -32,7 +32,6 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 app.title = 'AstroWatchdog'
-
 RANGE = [0, 1]
 
 img_width = 1400
@@ -108,7 +107,6 @@ def update_data(_, __):
                                                influxdb_df_client)
 
     return time.time(), last_point, data
-
 
 @app.callback([Output('object_name_val', 'children'),
                Output('image_time_val', 'children'),
@@ -193,8 +191,8 @@ def create_snr_figure(data, figure):
         value = pd.read_json(value)
         value = value.sort_values(by='image_time')
         value = value.tail(50)
-        logger.info(value)
-        logger.info('snr_graph value: {}'.format(value['SNR_WIN']))
+        # logger.info(value)
+        # logger.info('snr_graph value: {}'.format(value['SNR_WIN']))
         x = value.image_time
         y = value.SNR_WIN
         trace = go.Scatter(
@@ -303,6 +301,7 @@ def create_snr_figure(data, figure):
     
 app.css.append_css({
         "external_url": "/static/main.css"})
+
 
 if __name__ == '__main__':
 

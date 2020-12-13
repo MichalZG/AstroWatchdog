@@ -98,7 +98,7 @@ class Image:
                 layer='marker_set_1', edgecolor='red',
                 facecolor='none', marker='o', s=100, alpha=1)
             fig.add_label(0.21, 0.05,
-                "Dist to object: {:.1f}\"".format(
+                "Dist to object: {:.1f}\'".format(
                     self.coo_center.separation(
                             self.coo_target_hdr).arcmin),
                             color='red', size='xx-large', relative=True)
