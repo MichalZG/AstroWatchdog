@@ -54,7 +54,8 @@ MAIN_GRAPH_LAYOUT = go.Layout(title='',
                             )
 
 GRAPHS_POINTS_NUMBER = 20
-
+ALARM_TIME = 5 # min
+REFRESH_FREQ = 5 # sec
 
 app.layout = html.Div([
     html.Div([
@@ -112,10 +113,10 @@ app.layout = html.Div([
     ], className='graph_1_box'),
     dcc.Interval(
             id='interval',
-            interval=5*1000),
+            interval=REFRESH_FREQ*1000),
     html.Div(id='data_div', children=0, style={'display': 'none'}),
     html.Div(id='test_data_div', children=0, style={'display': 'none'}),
-], style={'backgroundColor': 'black'}, className='main')
+], style={'backgroundColor': 'black'}, className='main', id='main_div',)
 
 
 @app.callback([Output('data_div', 'children'),
@@ -135,7 +136,7 @@ def update_data(_, __):
                Output('image_exptime_val', 'children'),
                Output('image_filter_val', 'children'),
                Output('time_from_last_val', 'children'),
-               Output('time_from_last_val', 'style')],
+               Output('main_div', 'style')],
               [Input('data_div', 'data-last')])
 @utils.dump_func_name
 def update_image_info(data):
@@ -145,13 +146,13 @@ def update_image_info(data):
         image_datetime + dt.timedelta(seconds=float(data['EXPTIME']))- dt.datetime.utcnow()
     ).total_seconds() / 60.
 
-    if minutes_from_last < -5:
-        time_from_last_val_style = {'color': 'red'}
+    if minutes_from_last < -ALARM_TIME:
+        website_bkg_color = {'backgroundColor': 'red'}
     else:
-        time_from_last_val_style = {}
+        website_bkg_color = {'backgroundColor': 'black'}
 
     return (data['OBJECT'], image_time_str, data['EXPTIME'], data['FILTER'],
-            int(minutes_from_last), time_from_last_val_style)
+            int(minutes_from_last), website_bkg_color)
 
 
 @app.callback(Output('image', 'figure'),
