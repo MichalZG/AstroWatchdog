@@ -214,10 +214,16 @@ def prepare_data_for_influx(image, last_data):
             #fields[key] = value
         # FIXME problem here, no data if status = 1
         fields['SNR_WIN'] = int(image.target_measurements['SNR_WIN'])
+        fields['BACKGROUND'] = int(image.target_measurements['BACKGROUND'])
+        fields['FLUX_MAX'] = int(image.target_measurements['FLUX_MAX'])
+        fields['FWHM_IMAGE'] = int(image.target_measurements['FWHM_IMAGE'] * 100) #hotfix - only int for influx
         fields['PHOTOMETRY_STATUS'] = 1
     else:
         fields['PHOTOMETRY_STATUS'] = 0
         fields['SNR_WIN'] = 0
+        fields['BACKGROUND'] = 0
+        fields['FLUX_MAX'] = 0
+        fields['FWHM_IMAGE'] = 0
 
     fields['RA_HDR'] = round(image.coo_target_hdr.ra.deg, 6)
     fields['DEC_HDR'] = round(image.coo_target_hdr.dec.deg, 6)

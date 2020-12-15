@@ -44,6 +44,18 @@ html.H2('Object name', className='my-class', id='obj_name'),
                 html.H2('Filter', className='my-class', id='im_filter')
 """
 
+
+MAIN_GRAPH_LAYOUT = go.Layout(title='',
+                              paper_bgcolor='rgba(0, 0, 0, 0)',
+                              plot_bgcolor='rgba(0, 0, 0, 0)',
+                              margin={'l': 15, 'r': 5, 't': 25},
+                              template='plotly_dark',
+                              height=200,
+                            )
+
+GRAPHS_POINTS_NUMBER = 20
+
+
 app.layout = html.Div([
     html.Div([
         html.Div([
@@ -74,17 +86,27 @@ app.layout = html.Div([
             ], className='data')
     ]),
     html.Div([
-        dcc.Graph(id='snr_graph', className='snr_graph'),
-        html.Div([
-                html.H6('No', className='npf_label'),
-                dcc.Input(id='data_len_input', type='number',
-                    value=20, className='npf_val'),
-        ]),
-        html.Div([
-                html.H6('Filter', className='fts_label'),
-                dcc.Input(id='data_filter', type='text',
-                    value='', className='fts_val'),
-        ]),
+        dcc.Graph(id='snr_graph',
+            figure={
+                'data': [],
+                'layout': MAIN_GRAPH_LAYOUT},
+            className='snr_graph'),
+        dcc.Graph(id='flux_max_graph',
+            figure={
+                'data': [],
+                'layout': MAIN_GRAPH_LAYOUT},
+            className='flux_max_graph'),
+        dcc.Graph(id='bkg_graph', 
+            figure={
+                'data': [],
+                'layout': MAIN_GRAPH_LAYOUT},
+            className='bkg_graph'),
+        dcc.Graph(id='fwhm_graph', 
+            figure={
+                'data': [],
+                'layout': MAIN_GRAPH_LAYOUT},
+            className='fwhm_graph'),
+
         html.Button('Refresh', id='refresh_button',
                             className='refresh_button'),
     ], className='graph_1_box'),
@@ -120,7 +142,8 @@ def update_image_info(data):
     image_datetime = dt_parser.parse(data['image_time'])
     image_time_str = image_datetime.time().strftime("%H:%M:%S")
     minutes_from_last = (
-        image_datetime - dt.datetime.utcnow()).total_seconds() / 60.
+        image_datetime + dt.timedelta(seconds=float(data['EXPTIME']))- dt.datetime.utcnow()
+    ).total_seconds() / 60.
 
     if minutes_from_last < -5:
         time_from_last_val_style = {'color': 'red'}
@@ -162,7 +185,7 @@ def update_image(_):
             sizing="stretch",
             source='data:image/png;base64,{}'.format(encoded_image.decode()))
         ],
-        paper_bgcolor='rgba(0,20,20,20)',
+        paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)'
     )
 
@@ -179,20 +202,12 @@ def update_image(_):
 def create_snr_figure(data, figure):
 
     fig_data = []
-    # try:
-    #     visibilities = {
-    #         d.get('name'): d.get('visible') for d in figure['data']}
-    # except TypeError:
-    #     visibilities = {}
-
     for name, value in data.items():
         # index is first column not dt index
         # FIXME
         value = pd.read_json(value)
         value = value.sort_values(by='image_time')
-        value = value.tail(50)
-        # logger.info(value)
-        # logger.info('snr_graph value: {}'.format(value['SNR_WIN']))
+        value = value.tail(GRAPHS_POINTS_NUMBER)
         x = value.image_time
         y = value.SNR_WIN
         trace = go.Scatter(
@@ -206,99 +221,121 @@ def create_snr_figure(data, figure):
     figure = {
         'data': fig_data,
         'layout': go.Layout(title='SNR',
-                            paper_bgcolor='rgba(120,120,120,120)',
-                            plot_bgcolor='rgba(80,80,80,80)'
-                            )}
+                  paper_bgcolor='rgba(0, 0, 0, 0)',
+                  plot_bgcolor='rgba(0, 0, 0, 0)',
+                  margin={'l': 15, 'r': 5, 't': 25},
+                  template='plotly_dark',
+                  height=200,)
+        }
 
     return figure
 
-# @app.callback([Output('data_div', 'data-tmp')],
-#               [Input('object_name', 'value'),
-#                Input('image_time', 'value'),
-#                Input('image_exptime', 'value'),
-#                Input('image_filter', 'value')])
-# def test(a, b, c, d):
-#     pass
-# @app.callback(Output('peak_graph', 'figure'),
-#              [Input('data_div', 'children')],
-#              [State('peak_graph', 'figure')])
-# @utils.dump_func_name
-# def create_peak_figure(update, figure):
-
-#     if True:
-#         redis_data = pickle.loads(redis_client.get('state_old'))
-
-#         time_start = dt_parser.parse(
-#             ' '.join([redis_data['DATE-OBS'],
-#                       redis_data['TIME-OBS']])) - timedelta(hours=1)
-#         object_name = redis_data['OBJECT']
-
-#         data = utils.get_influxdb_data(object_name,
-#             time_start.isoformat())
-
-#         fig_data = []
-#         try:
-#             visibilities = {
-#                 d.get('name'): d.get('visible') for d in figure['data']}
-#         except TypeError:
-#             visibilities = {}
-
-#         for name, value in data.items():
-#             value = value.dropna()
-#             trace = go.Scatter(
-#                 x=value.index,
-#                 y=value['FLUX_MAX'],
-#                 name=name,
-#                 # visible='legendonly',
-#                 mode = 'lines+markers')
-#             fig_data.append(trace)
-
-#         figure = {
-#             'data': fig_data,
-#             'layout': go.Layout(title='PEAK',
-#                                 paper_bgcolor='rgba(0,0,0,0)',
-#                                 plot_bgcolor='rgba(0,0,0,0)')}
-
-#     return figure
-
-
-# @app.callback(Output('fwhm_graph', 'figure'),
-#              [Input('data', 'children')],
-#              [State('fwhm_graph', 'figure')])
-# @utils.dump_func_name
-# def create_fwhm_figure(update, figure):
-#     if update:
-#         redis_data = pickle.loads(redis_client.get('state_old'))
-#         print(redis_data)
-#         time_start = dt_parser.parse(
-#             ' '.join([redis_data['DATE-OBS'],
-#                       redis_data['TIME-OBS']])) - timedelta(hours=12)
-#         object_name = redis_data['OBJECT']
-
-#         data = utils.get_influxdb_data(object_name,
-#             time_start.isoformat())
-
-#         fig_data = []
-#         try:
-#             visibilities = {d.get('name'): d.get(
-#                 'visible') for d in figure['data']}
-#         except TypeError:
-#             visibilities = {}
-
-#         for name, value in data.items():
-#             trace = go.Scatter(
-#                 x=value.index,
-#                 y=value['FWHM_IMAGE'],
-#                 name=name,
-#                 visible=visibilities.get(name) or 'legendonly',
-#                 mode = 'lines+markers')
-#             fig_data.append(trace)
-
-#         figure = {
-#             'data': fig_data}
-
-#     return figure
     
+@app.callback(Output('flux_max_graph', 'figure'),
+             [Input('data_div', 'data-main')],
+             [State('flux_max_graph', 'figure')])
+@utils.dump_func_name
+def create_flux_max_figure(data, figure):
+
+    fig_data = []
+    for name, value in data.items():
+        # index is first column not dt index
+        # FIXME
+        value = pd.read_json(value)
+        value = value.sort_values(by='image_time')
+        value = value.tail(GRAPHS_POINTS_NUMBER)
+        x = value.image_time
+        y = value.FLUX_MAX
+        trace = go.Scatter(
+            x=x,
+            y=y,
+            name=name,
+            # visible='legendonly',
+            mode = 'lines+markers')
+        fig_data.append(trace)
+
+    figure = {
+        'data': fig_data,
+        'layout': go.Layout(title='FLUX MAX',
+                  paper_bgcolor='rgba(0, 0, 0, 0)',
+                  plot_bgcolor='rgba(0, 0, 0, 0)',
+                  margin={'l': 15, 'r': 5, 't': 25},
+                  template='plotly_dark',
+                  height=200,)
+        }
+
+    return figure
+
+
+@app.callback(Output('bkg_graph', 'figure'),
+             [Input('data_div', 'data-main')],
+             [State('bkg_graph', 'figure')])
+@utils.dump_func_name
+def create_flux_max_figure(data, figure):
+
+    fig_data = []
+    for name, value in data.items():
+        # index is first column not dt index
+        # FIXME
+        value = pd.read_json(value)
+        value = value.sort_values(by='image_time')
+        value = value.tail(GRAPHS_POINTS_NUMBER)
+        x = value.image_time
+        y = value.BACKGROUND
+        trace = go.Scatter(
+            x=x,
+            y=y,
+            name=name,
+            # visible='legendonly',
+            mode = 'lines+markers')
+        fig_data.append(trace)
+
+    figure = {
+        'data': fig_data,
+        'layout': go.Layout(title='BACKGROUND',
+                  paper_bgcolor='rgba(0, 0, 0, 0)',
+                  plot_bgcolor='rgba(0, 0, 0, 0)',
+                  margin={'l': 15, 'r': 5, 't': 25},
+                  template='plotly_dark',
+                  height=200,)
+        }
+
+    return figure
+
+@app.callback(Output('fwhm_graph', 'figure'),
+             [Input('data_div', 'data-main')],
+             [State('fwhm_graph', 'figure')])
+@utils.dump_func_name
+def create_flux_max_figure(data, figure):
+
+    fig_data = []
+    for name, value in data.items():
+        # index is first column not dt index
+        # FIXME
+        value = pd.read_json(value)
+        value = value.sort_values(by='image_time')
+        value = value.tail(GRAPHS_POINTS_NUMBER)
+        x = value.image_time
+        y = value.FWHM_IMAGE / 100.
+        trace = go.Scatter(
+            x=x,
+            y=y,
+            name=name,
+            # visible='legendonly',
+            mode = 'lines+markers')
+        fig_data.append(trace)
+
+    figure = {
+        'data': fig_data,
+        'layout': go.Layout(title='FWHM',
+                  paper_bgcolor='rgba(0, 0, 0, 0)',
+                  plot_bgcolor='rgba(0, 0, 0, 0)',
+                  margin={'l': 15, 'r': 5, 't': 25},
+                  template='plotly_dark',
+                  height=200,)
+        }
+
+    return figure
 app.css.append_css({
         "external_url": "/static/main.css"})
 
