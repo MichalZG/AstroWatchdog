@@ -109,7 +109,9 @@ app.layout = html.Div([
             className='fwhm_graph'),
 
         html.Button('Refresh', id='refresh_button',
-                            className='refresh_button'),
+                            className='refresh_button',
+                            # n_clicks_timestamp=time.time()*1000),
+                            n_clicks_timestamp=0),
     ], className='graph_1_box'),
     dcc.Interval(
             id='interval',
@@ -123,12 +125,14 @@ app.layout = html.Div([
                Output('data_div', 'data-last'),
                Output('data_div', 'data-main')],
               [Input('refresh_button', 'n_clicks_timestamp'),
-               Input('interval', 'n_intervals')])
+               Input('interval', 'n_intervals')],
+              [State('refresh_button', 'n_clicks_timestamp')])
 @utils.dump_func_name
-def update_data(_, __):
+def update_data(_, __, refresh_timestamp):
     last_point, data = utils.get_influxdb_data(influxdb_client,
-                                               influxdb_df_client)
-
+                                               influxdb_df_client,
+                                               refresh_timestamp)
+    print(data)
     return time.time(), last_point, data
 
 @app.callback([Output('object_name_val', 'children'),
@@ -198,11 +202,17 @@ def update_image(_):
 
 @app.callback(Output('snr_graph', 'figure'),
              [Input('data_div', 'data-main')],
-             [State('snr_graph', 'figure')])
+             [State('data_div', 'data-last'),
+              State('snr_graph', 'figure')])
 @utils.dump_func_name
-def create_snr_figure(data, figure):
+def create_snr_figure(data, data_last, figure):
 
     fig_data = []
+    title_value = ""
+
+    if data:
+        title_value = f"{data_last['SNR_WIN']}"
+
     for name, value in data.items():
         # index is first column not dt index
         # FIXME
@@ -219,12 +229,13 @@ def create_snr_figure(data, figure):
             mode = 'lines+markers')
         fig_data.append(trace)
 
+
     figure = {
         'data': fig_data,
-        'layout': go.Layout(title='SNR',
+        'layout': go.Layout(title=f'SNR: {title_value}',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
                   plot_bgcolor='rgba(0, 0, 0, 0)',
-                  margin={'l': 15, 'r': 5, 't': 25},
+                  margin={'l': 15, 'r': 5, 't': 30},
                   template='plotly_dark',
                   height=200,)
         }
@@ -234,11 +245,17 @@ def create_snr_figure(data, figure):
     
 @app.callback(Output('flux_max_graph', 'figure'),
              [Input('data_div', 'data-main')],
-             [State('flux_max_graph', 'figure')])
+             [State('data_div', 'data-last'),
+              State('flux_max_graph', 'figure')])
 @utils.dump_func_name
-def create_flux_max_figure(data, figure):
+def create_flux_max_figure(data, data_last, figure):
 
     fig_data = []
+    title_value = ""
+
+    if data:
+        title_value = f"{data_last['FLUX_MAX']}"
+
     for name, value in data.items():
         # index is first column not dt index
         # FIXME
@@ -257,7 +274,7 @@ def create_flux_max_figure(data, figure):
 
     figure = {
         'data': fig_data,
-        'layout': go.Layout(title='FLUX MAX',
+        'layout': go.Layout(title=f'FLUX MAX: {title_value}',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
                   plot_bgcolor='rgba(0, 0, 0, 0)',
                   margin={'l': 15, 'r': 5, 't': 25},
@@ -270,11 +287,17 @@ def create_flux_max_figure(data, figure):
 
 @app.callback(Output('bkg_graph', 'figure'),
              [Input('data_div', 'data-main')],
-             [State('bkg_graph', 'figure')])
+             [State('data_div', 'data-last'),
+              State('bkg_graph', 'figure')])
 @utils.dump_func_name
-def create_flux_max_figure(data, figure):
+def create_bgk_value_figure(data, data_last, figure):
 
     fig_data = []
+    title_value = ""
+
+    if data:
+        title_value = f"{data_last['BACKGROUND']}"
+
     for name, value in data.items():
         # index is first column not dt index
         # FIXME
@@ -293,7 +316,7 @@ def create_flux_max_figure(data, figure):
 
     figure = {
         'data': fig_data,
-        'layout': go.Layout(title='BACKGROUND',
+        'layout': go.Layout(title=f'BACKGROUND: {title_value}',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
                   plot_bgcolor='rgba(0, 0, 0, 0)',
                   margin={'l': 15, 'r': 5, 't': 25},
@@ -305,11 +328,17 @@ def create_flux_max_figure(data, figure):
 
 @app.callback(Output('fwhm_graph', 'figure'),
              [Input('data_div', 'data-main')],
-             [State('fwhm_graph', 'figure')])
+             [State('data_div', 'data-last'),
+              State('fwhm_graph', 'figure')])
 @utils.dump_func_name
-def create_flux_max_figure(data, figure):
+def create_fwhm_figure(data, data_last, figure):
 
     fig_data = []
+    title_value = ""
+
+    if data:
+        title_value = f"{data_last['FWHM_IMAGE']}"
+
     for name, value in data.items():
         # index is first column not dt index
         # FIXME
@@ -328,7 +357,7 @@ def create_flux_max_figure(data, figure):
 
     figure = {
         'data': fig_data,
-        'layout': go.Layout(title='FWHM',
+        'layout': go.Layout(title=f'FWHM: {title_value}',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
                   plot_bgcolor='rgba(0, 0, 0, 0)',
                   margin={'l': 15, 'r': 5, 't': 25},

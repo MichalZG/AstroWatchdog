@@ -1,6 +1,6 @@
 import configparser 
 import logging
-import datetime as dt
+from datetime import datetime as dt
 from influxdb import InfluxDBClient, DataFrameClient
 import uuid
 
@@ -39,25 +39,28 @@ def get_influxdb_clients():
 
 
 @dump_func_name
-def get_influxdb_data(client, df_client):
+def get_influxdb_data(client, df_client, refresh_timestamp):
 
-    last_element_query = 'select * from image order by desc limit 1'
-    last_result = list(client.query(last_element_query).get_points())[0]
+    last_element_query = 'select * from image order by desc limit 200'
+    last_result = list(client.query(last_element_query).get_points())[-1]
     
     last_uuid = last_result['uuid']
-    
-    data_query = 'select * from image where uuid = \'{}\' group by "FILTER" \
-                  order by desc'.format(last_uuid)
+    # refresh_timestamp = '2015-08-18T00:12:00Z'
+    logger.info(refresh_timestamp)
+    if refresh_timestamp is None: refresh_timestamp = 0
+    refresh_datetime = dt.fromtimestamp(refresh_timestamp / 1000)
+    refresh_datetime = refresh_datetime.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+    data_query = 'select * from image where uuid = \'{}\' and time > \'{}\' group by "FILTER" \
+                  order by desc'.format(last_uuid, refresh_datetime)
     
     #data_query = 'select * from image group by "FILTER" order by asc limit 100'.format(
     #                 uuid
     #                )
-
     result = df_client.query(data_query)
-    result = dict(
-        [(k[1][0][1], v.reset_index(
-            level=0).to_json()) for k, v in result.items()])
-    # logger.info('influx result: {}'.format(result))
+    if result:
+        result = dict(
+            [(k[1][0][1], v.reset_index(
+                level=0).to_json()) for k, v in result.items()])
     return last_result, result
 
 
