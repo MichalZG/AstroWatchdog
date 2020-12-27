@@ -68,11 +68,11 @@ app.layout = html.Div([
                     html.H3('---', id='object_name_val'),
                 ],),
                 html.Div([
-                    html.H3('Image time '),
+                    html.H3('Image time [UT]'),
                     html.H3('---', id='image_time_val'),
                 ], className='it'),
                 html.Div([
-                    html.H3('Exptime '),                        
+                    html.H3('Exptime [s]'),                        
                     html.H3('---', id='image_exptime_val'),
                 ], className='et'),
                 html.Div([
@@ -110,8 +110,8 @@ app.layout = html.Div([
 
         html.Button('Refresh', id='refresh_button',
                             className='refresh_button',
-                            # n_clicks_timestamp=time.time()*1000),
-                            n_clicks_timestamp=0),
+                            n_clicks_timestamp=time.time()*1000),
+                            # n_clicks_timestamp=0),
     ], className='graph_1_box'),
     dcc.Interval(
             id='interval',
@@ -200,130 +200,75 @@ def update_image(_):
     return figure
 
 
+@utils.dump_func_name
+def create_base_graph(data, data_last, data_key, title_prefix, **kwargs):
+
+    fig_data = []
+    title_value = ""
+
+    if data:
+        title_value = f"{data_last[data_key]}"
+
+    for name, value in data.items():
+        value = pd.read_json(value)
+        value = value.sort_values(by='image_time')
+        value = value.tail(GRAPHS_POINTS_NUMBER)
+        x = value['image_time']
+        y = value[data_key]
+        trace = go.Scatter(
+            x=x,
+            y=y,
+            name=name,
+            mode = 'lines+markers')
+        fig_data.append(trace)
+
+    figure = {
+        'data': fig_data,
+        'layout': go.Layout(title=f'{title_prefix}: {title_value}',
+                  paper_bgcolor='rgba(0, 0, 0, 0)',
+                  plot_bgcolor='rgba(0, 0, 0, 0)',
+                  margin={
+                      'l': kwargs.get('margin_l', 15),
+                      'r': kwargs.get('margin_r', 5),
+                      't': kwargs.get('margin_t', 25),
+                  },
+                  template='plotly_dark',
+                  height=kwargs.get('height', 200),
+                  width=kwargs.get('width', 600),
+            )
+        }
+
+    return figure
+
+
 @app.callback(Output('snr_graph', 'figure'),
              [Input('data_div', 'data-main')],
              [State('data_div', 'data-last'),
               State('snr_graph', 'figure')])
 @utils.dump_func_name
-def create_snr_figure(data, data_last, figure):
+def create_snr_graph(data, data_last, figure):
 
-    fig_data = []
-    title_value = ""
-
-    if data:
-        title_value = f"{data_last['SNR_WIN']}"
-
-    for name, value in data.items():
-        # index is first column not dt index
-        # FIXME
-        value = pd.read_json(value)
-        value = value.sort_values(by='image_time')
-        value = value.tail(GRAPHS_POINTS_NUMBER)
-        x = value.image_time
-        y = value.SNR_WIN
-        trace = go.Scatter(
-            x=x,
-            y=y,
-            name=name,
-            # visible='legendonly',
-            mode = 'lines+markers')
-        fig_data.append(trace)
-
-
-    figure = {
-        'data': fig_data,
-        'layout': go.Layout(title=f'SNR: {title_value}',
-                  paper_bgcolor='rgba(0, 0, 0, 0)',
-                  plot_bgcolor='rgba(0, 0, 0, 0)',
-                  margin={'l': 15, 'r': 5, 't': 30},
-                  template='plotly_dark',
-                  height=200,)
-        }
-
+    figure = create_base_graph(data, data_last, 'SNR_WIN', 'SNR', margin_t=30)
     return figure
 
-    
 @app.callback(Output('flux_max_graph', 'figure'),
              [Input('data_div', 'data-main')],
              [State('data_div', 'data-last'),
               State('flux_max_graph', 'figure')])
 @utils.dump_func_name
-def create_flux_max_figure(data, data_last, figure):
+def create_fluxmax_graph(data, data_last, figure):  
 
-    fig_data = []
-    title_value = ""
-
-    if data:
-        title_value = f"{data_last['FLUX_MAX']}"
-
-    for name, value in data.items():
-        # index is first column not dt index
-        # FIXME
-        value = pd.read_json(value)
-        value = value.sort_values(by='image_time')
-        value = value.tail(GRAPHS_POINTS_NUMBER)
-        x = value.image_time
-        y = value.FLUX_MAX
-        trace = go.Scatter(
-            x=x,
-            y=y,
-            name=name,
-            # visible='legendonly',
-            mode = 'lines+markers')
-        fig_data.append(trace)
-
-    figure = {
-        'data': fig_data,
-        'layout': go.Layout(title=f'FLUX MAX: {title_value}',
-                  paper_bgcolor='rgba(0, 0, 0, 0)',
-                  plot_bgcolor='rgba(0, 0, 0, 0)',
-                  margin={'l': 15, 'r': 5, 't': 25},
-                  template='plotly_dark',
-                  height=200,)
-        }
-
+    figure = create_base_graph(data, data_last, 'FLUX_MAX', 'FLUX MAX')
     return figure
-
 
 @app.callback(Output('bkg_graph', 'figure'),
              [Input('data_div', 'data-main')],
              [State('data_div', 'data-last'),
               State('bkg_graph', 'figure')])
 @utils.dump_func_name
-def create_bgk_value_figure(data, data_last, figure):
-
-    fig_data = []
-    title_value = ""
-
-    if data:
-        title_value = f"{data_last['BACKGROUND']}"
-
-    for name, value in data.items():
-        # index is first column not dt index
-        # FIXME
-        value = pd.read_json(value)
-        value = value.sort_values(by='image_time')
-        value = value.tail(GRAPHS_POINTS_NUMBER)
-        x = value.image_time
-        y = value.BACKGROUND
-        trace = go.Scatter(
-            x=x,
-            y=y,
-            name=name,
-            # visible='legendonly',
-            mode = 'lines+markers')
-        fig_data.append(trace)
-
-    figure = {
-        'data': fig_data,
-        'layout': go.Layout(title=f'BACKGROUND: {title_value}',
-                  paper_bgcolor='rgba(0, 0, 0, 0)',
-                  plot_bgcolor='rgba(0, 0, 0, 0)',
-                  margin={'l': 15, 'r': 5, 't': 25},
-                  template='plotly_dark',
-                  height=200,)
-        }
-
+def create_bgk_value_graph(data, data_last, figure):
+   
+    figure = create_base_graph(data, data_last, 'BACKGROUND', 'BKG')
     return figure
 
 @app.callback(Output('fwhm_graph', 'figure'),
@@ -331,44 +276,16 @@ def create_bgk_value_figure(data, data_last, figure):
              [State('data_div', 'data-last'),
               State('fwhm_graph', 'figure')])
 @utils.dump_func_name
-def create_fwhm_figure(data, data_last, figure):
+def create_fwhm_graph(data, data_last, figure):
 
-    fig_data = []
-    title_value = ""
-
-    if data:
-        title_value = f"{data_last['FWHM_IMAGE']}"
-
-    for name, value in data.items():
-        # index is first column not dt index
-        # FIXME
-        value = pd.read_json(value)
-        value = value.sort_values(by='image_time')
-        value = value.tail(GRAPHS_POINTS_NUMBER)
-        x = value.image_time
-        y = value.FWHM_IMAGE / 100.
-        trace = go.Scatter(
-            x=x,
-            y=y,
-            name=name,
-            # visible='legendonly',
-            mode = 'lines+markers')
-        fig_data.append(trace)
-
-    figure = {
-        'data': fig_data,
-        'layout': go.Layout(title=f'FWHM: {title_value}',
-                  paper_bgcolor='rgba(0, 0, 0, 0)',
-                  plot_bgcolor='rgba(0, 0, 0, 0)',
-                  margin={'l': 15, 'r': 5, 't': 25},
-                  template='plotly_dark',
-                  height=200,)
-        }
-
+    figure = create_base_graph(data, data_last, 'FWHM_IMAGE', 'FWHM')
     return figure
+
+
+
+
 app.css.append_css({
         "external_url": "/static/main.css"})
-
 
 if __name__ == '__main__':
 

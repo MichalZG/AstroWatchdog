@@ -16,8 +16,6 @@ def dump_func_name(func):
         return func(*func_args, **func_kwargs)
     return echo_func
 
-
-
 @dump_func_name
 def get_influxdb_clients():
     # FIXME
@@ -37,12 +35,11 @@ def get_influxdb_clients():
 
     return influxdb_client, influxdb_df_client
 
-
 @dump_func_name
 def get_influxdb_data(client, df_client, refresh_timestamp):
 
-    last_element_query = 'select * from image order by desc limit 200'
-    last_result = list(client.query(last_element_query).get_points())[-1]
+    last_element_query = 'select * from image order by desc limit 1'
+    last_result = list(client.query(last_element_query).get_points())[0]
     
     last_uuid = last_result['uuid']
     # refresh_timestamp = '2015-08-18T00:12:00Z'
@@ -63,21 +60,3 @@ def get_influxdb_data(client, df_client, refresh_timestamp):
                 level=0).to_json()) for k, v in result.items()])
     return last_result, result
 
-
-# @dump_func_name
-# def get_last_influxdb_data():
-
-#     query_body = 'select * from image order by desc limit 1'
-                  
-#     client = DataFrameClient(
-#         config.get('INFLUXDB', 'ADDRESS'),
-#         config.get('INFLUXDB', 'PORT'),
-#         config.get('INFLUXDB', 'USER'),
-#         config.get('INFLUXDB', 'PASSWORD'),
-#         config.get('INFLUXDB', 'DB_NAME'))
-
-#     result = client.query(query_body)
-#     logger.info('result: {}'.format(result))
-#     result = dict([(k[1][0][1], v) for k, v in result.items()])
-
-#     return result
