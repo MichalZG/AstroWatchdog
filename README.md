@@ -1,4 +1,5 @@
-# AstroWatchdog
+![logo](./logo.jpg)
+
 AstroWatchdog is software for real-time monitoring of astronomical observations.
 Each new image obtained and saved by the camera software is automatically analyzed just after appearing.<br>
 Main tasks:
