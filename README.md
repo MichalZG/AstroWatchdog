@@ -1,7 +1,7 @@
 # AstroWatchdog
 AstroWatchdog is software for real-time monitoring of astronomical observations.
 Each new image obtained and saved by the camera software is automatically analyzed just after appearing.<br>
-Main tasks:\
+Main tasks:
 <ul>
 <li> Displaying the last frame from the telescope main camera as a sky image </li>
 <li> Displaying basic information about the last frame </li>
@@ -18,9 +18,9 @@ Moreover, basic photometry will be taken from the target. Values like SNR, FLUX_
 
 If there is no possibility to obtain a telescope position from a telescope system, Astrowatchodog can use header keys (like target coordinates)
 for astrometry solution. 
-The coordinates have to be close to the real telescope position but there can be a (Bigger radius will significantly extend the execution time) \
+The coordinates have to be close to the real telescope position but there can be a (Bigger radius will significantly extend the execution time) 
 
-AstroWatchdog consists of two base modules: \
+AstroWatchdog consists of two base modules: 
 <ul>
 <li> Factory - module for monitoring the appearance of new files and analyzing them </li>
 <li> Monitor - module for showing the results on the website </li>
