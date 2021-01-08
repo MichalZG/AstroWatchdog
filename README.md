@@ -21,17 +21,17 @@ for astrometry solution.
 The coordinates have to be close to the real telescope position but there can be a (Bigger radius will significantly extend the execution time) 
 
 AstroWatchdog consists of two base modules: 
-<ul>
-<li> Factory - module for monitoring the appearance of new files and analyzing them </li>
-<li> Monitor - module for showing the results on the website </li>
-</ul>
-But there are additional modules used by AstroWatchdog:
-<ul>
-<li> [Nova](http://nova.astrometry.net/) - Astrometry.net software used by factory module for finding astrometric solutions </li>
-<li> [SExtractor](https://www.astromatic.net/software/sextractor) - Astromatic software used by the factory for obtaining photometry results of frame sources </li>
-<li> [Redis](https://redis.io/) - in-memory database, used to communicate between factory and monitor </li>
-<li> [InfluxDB](https://www.influxdata.com/) - time-series database for storing frames data </li>
-</ul>
+-----
+- Factory - module for monitoring the appearance of new files and analyzing them </li>
+- Monitor - module for showing the results on the website </li>
+
+Additional modules used by AstroWatchdog: 
+
+- [Nova](http://nova.astrometry.net) - Astrometry.net software used by factory module for finding astrometric solutions </li>
+- [SExtractor](https://www.astromatic.net/software/sextractor) - Astromatic software used by the factory for obtaining photometry results of frame sources </li>
+- [Redis](https://redis.io/) - in-memory database, used to communicate between factory and monitor </li>
+- [InfluxDB](https://www.influxdata.com/) - time-series database for storing frames data </li>
 
 Redis, Influx, and nova are controlled by [docker-compose](https://docs.docker.com/compose/). SExtractor is invoked as a standalone Docker container when needed.
 Data synchronization between AstroWatchdog and telescope control-computer is done by a simple bash script controlled by Unix service manager.
+
