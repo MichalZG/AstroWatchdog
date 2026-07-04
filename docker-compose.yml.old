@@ -15,7 +15,7 @@ services:
   #     - redis
 
   influxdb:
-    image: influxdb:1.8-alpine
+    image: influxdb:latest
     container_name: influxdb
     ports:
       - "8083:8083"

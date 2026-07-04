@@ -21,7 +21,7 @@ import pandas as pd
 
 logging.basicConfig(
     filename='monitor.log',
-    level=logging.INFO,
+    level=logging.WARNING,
     format='%(asctime)s %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -205,16 +205,18 @@ def create_base_graph(data, data_last, data_key, title_prefix, **kwargs):
 
     fig_data = []
     title_value = ""
+    title_suffix = kwargs.get('title_suffix', '')
+    div_val = kwargs.get('div_val', 1)
 
     if data:
-        title_value = f"{data_last[data_key]}"
+        title_value = f"{data_last[data_key] / div_val}"
 
     for name, value in data.items():
         value = pd.read_json(value)
         value = value.sort_values(by='image_time')
         value = value.tail(GRAPHS_POINTS_NUMBER)
         x = value['image_time']
-        y = value[data_key]
+        y = value[data_key] / div_val
         trace = go.Scatter(
             x=x,
             y=y,
@@ -224,7 +226,8 @@ def create_base_graph(data, data_last, data_key, title_prefix, **kwargs):
 
     figure = {
         'data': fig_data,
-        'layout': go.Layout(title=f'{title_prefix}: {title_value}',
+        'layout': go.Layout(
+                  title=f'{title_prefix}: {title_value} {title_suffix}',
                   paper_bgcolor='rgba(0, 0, 0, 0)',
                   plot_bgcolor='rgba(0, 0, 0, 0)',
                   margin={
@@ -248,7 +251,8 @@ def create_base_graph(data, data_last, data_key, title_prefix, **kwargs):
 @utils.dump_func_name
 def create_snr_graph(data, data_last, figure):
 
-    figure = create_base_graph(data, data_last, 'SNR_WIN', 'SNR', margin_t=30)
+    figure = create_base_graph(data, data_last, 'SNR_WIN', 'SNR',
+                               margin_t=30)
     return figure
 
 @app.callback(Output('flux_max_graph', 'figure'),
@@ -278,7 +282,8 @@ def create_bgk_value_graph(data, data_last, figure):
 @utils.dump_func_name
 def create_fwhm_graph(data, data_last, figure):
 
-    figure = create_base_graph(data, data_last, 'FWHM_IMAGE', 'FWHM')
+    figure = create_base_graph(data, data_last, 'FWHM_IMAGE', 'FWHM',
+                               div_val=100, title_suffix='[pix]')
     return figure
 
 
