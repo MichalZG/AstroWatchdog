@@ -124,13 +124,12 @@ def read_sex_cat(data_path):
                           'X_IMAGE', 'Y_IMAGE','FWHM_IMAGE']
     output = dict([(column, []) for column in sextractor_columns])
 
-    with open(data_path) as f:
-        for line in f:
-            line = line.rstrip("\n").split()
-            if line[0] == '#':
-                continue
-            for column_name, column_value in zip(sextractor_columns, line):
-                output[column_name].append(float(column_value))
+    from astropy.io import fits as afits
+    with afits.open(data_path) as hdul:
+        data = hdul[2].data  # LDAC_OBJECTS extension
+        for column_name in sextractor_columns:
+            col_data = data[column_name]
+            output[column_name] = list(col_data)
 
     return output
 
@@ -139,27 +138,87 @@ def read_sex_cat(data_path):
 def run_astrometry(image, image_path):
     logger.info('ASTROMETRY: start')
     image_base_name = os.path.basename(image_path)
+
+    # Build a simple FITS xylist from the SExtractor FITS_LDAC catalog
+    cat_path = image_path + '.cat'
+    xyls_path = image_path + '.xyls'
+    try:
+        from astropy.io import fits as afits
+        import numpy as np
+        with afits.open(cat_path) as hdul:
+            cat_data = hdul[2].data  # LDAC_OBJECTS extension
+            x = np.array(cat_data[config.get('SOLVE', 'X_COLUMN')], dtype=np.float64)
+            y = np.array(cat_data[config.get('SOLVE', 'Y_COLUMN')], dtype=np.float64)
+            mag = np.array(cat_data[config.get('SOLVE', 'SORT_COLUMN')], dtype=np.float64)
+        col_x = afits.Column(name='X', array=x, format='D')
+        col_y = afits.Column(name='Y', array=y, format='D')
+        col_mag = afits.Column(name=config.get('SOLVE', 'SORT_COLUMN'), array=mag, format='D')
+        hdu = afits.BinTableHDU.from_columns([col_x, col_y, col_mag])
+        hdu.writeto(xyls_path, overwrite=True)
+        logger.info('ASTROMETRY: wrote xylist with {} sources'.format(len(x)))
+    except Exception as e:
+        logger.error('ASTROMETRY: failed to build xylist: {}'.format(e))
+        return None, False
+
+    # Get image dimensions for solve-field
+    with afits.open(image_path) as hdul:
+        width = hdul[0].header.get('NAXIS1', 0)
+        height = hdul[0].header.get('NAXIS2', 0)
+
+    xyls_container_path = '/data_market/' + image_base_name + '.xyls'
+    new_fits_path = '/data_market/' + image_base_name + '.new'
     solve_field_command = [
         'docker', 'exec', 'nova', 'solve-field',
         '--ra', '%s' % image.coo_target_hdr.ra.deg,
         '--dec', '%s' % image.coo_target_hdr.dec.deg,
         '--radius', '%1.1f' % config.getfloat('SOLVE', 'SOLVE_RADIUS'),
-        '--depth', config.get('SOLVE', 'SOLVE_DEPTH'),
         '--cpulimit', '%f' % config.getfloat('SOLVE', 'CPU_LIMIT'),
         '--scale-units', config.get('SOLVE', 'SCALE_UNITS'),
         '--scale-low', '%.5f' % config.getfloat('SOLVE', 'SCALE_LOW'),
         '--scale-high', '%.5f' % config.getfloat('SOLVE', 'SCALE_HIGH'),
-        '--overwrite', '--no-verify', '--no-plots',
-        '/data_market/' + image_base_name]
+        '--width', '%d' % width,
+        '--height', '%d' % height,
+        '--x-column', 'X',
+        '--y-column', 'Y',
+        '--sort-column', config.get('SOLVE', 'SORT_COLUMN'),
+        '--sort-ascending',
+        '--new-fits', new_fits_path,
+        '--overwrite', '--no-plots',
+        xyls_container_path]
 
     sub.Popen(solve_field_command, stdout=sub.PIPE,
               stderr=sub.PIPE).communicate()
 
-    wcs_file_path = str(image_path).replace('.fits', '.new')
+    # For xylist input, solve-field creates .wcs (header only, no image data).
+    # Build .new by copying the original FITS and appending WCS header cards.
+    wcs_file_path = image_path + '.wcs'
+    new_file_path = image_path + '.new'
 
     if os.path.exists(wcs_file_path):
-        logger.info('ASTROMETRY: success')
-        return wcs_file_path, True
+        try:
+            from astropy.io import fits as afits
+            # Read WCS header from .wcs
+            with afits.open(wcs_file_path) as wcs_hdul:
+                wcs_hdr = wcs_hdul[0].header
+            # Copy original image and update its header with WCS
+            with afits.open(image_path) as img_hdul:
+                hdr = img_hdul[0].header
+                # Remove existing WCS keys
+                for key in list(hdr.keys()):
+                    if key.startswith(('CTYPE', 'CRVAL', 'CRPIX', 'CUNIT',
+                                       'CD', 'CDELT', 'PC', 'WCSAXES',
+                                       'EQUINOX', 'LONPOLE', 'LATPOLE')):
+                        del hdr[key]
+                # Add WCS keys from solved header
+                for key, val in wcs_hdr.items():
+                    if key not in ('SIMPLE', 'BITPIX', 'NAXIS', 'EXTEND'):
+                        hdr[key] = val
+                img_hdul[0].header = hdr
+                img_hdul.writeto(new_file_path, overwrite=True)
+            logger.info('ASTROMETRY: success, wrote {}'.format(new_file_path))
+            return new_file_path, True
+        except Exception as e:
+            logger.error('ASTROMETRY: failed to build .new: {}'.format(e))
 
     logger.info('ASTROMETRY: FAILED')
     return None, False
