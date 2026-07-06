@@ -17,6 +17,7 @@ from pprint import pprint as pp
 import base64
 import time 
 import uuid
+import json
 import pandas as pd
 
 logging.basicConfig(
@@ -118,6 +119,13 @@ app.layout = html.Div([
             interval=REFRESH_FREQ*1000),
     html.Div(id='data_div', children=0, style={'display': 'none'}),
     html.Div(id='test_data_div', children=0, style={'display': 'none'}),
+    html.Div(id='alarm_state', children='false', style={'display': 'none'}),
+    html.Div(id='sound_state', children='{"sound_enabled": true, "sound_reset": false, "prev_reset_ts": 0, "prev_toggle_ts": 0}', style={'display': 'none'}),
+    html.Div(id='audio_container', style={'display': 'none'}),
+    html.Div([
+        html.Button('Reset', id='reset_sound', n_clicks_timestamp=0, className='sound-btn'),
+        html.Button('Sound: ON', id='sound_toggle', n_clicks_timestamp=0, className='sound-btn'),
+    ], className='sound-controls'),
 ], style={'backgroundColor': 'black'}, className='main', id='main_div',)
 
 
@@ -140,7 +148,8 @@ def update_data(_, __, refresh_timestamp):
                Output('image_exptime_val', 'children'),
                Output('image_filter_val', 'children'),
                Output('time_from_last_val', 'children'),
-               Output('main_div', 'style')],
+               Output('main_div', 'style'),
+               Output('alarm_state', 'children')],
               [Input('data_div', 'data-last')])
 @utils.dump_func_name
 def update_image_info(data):
@@ -150,13 +159,15 @@ def update_image_info(data):
         image_datetime + dt.timedelta(seconds=float(data['EXPTIME']))- dt.datetime.utcnow()
     ).total_seconds() / 60.
 
-    if minutes_from_last < -ALARM_TIME:
+    alarm_active = minutes_from_last < -ALARM_TIME
+    if alarm_active:
         website_bkg_color = {'backgroundColor': 'red'}
     else:
         website_bkg_color = {'backgroundColor': 'black'}
 
     return (data['OBJECT'], image_time_str, data['EXPTIME'], data['FILTER'],
-            int(minutes_from_last), website_bkg_color)
+            int(minutes_from_last), website_bkg_color,
+            'true' if alarm_active else 'false')
 
 
 @app.callback(Output('image', 'figure'),
@@ -287,6 +298,49 @@ def create_fwhm_graph(data, data_last, figure):
     return figure
 
 
+
+
+@app.callback([Output('audio_container', 'children'),
+               Output('sound_state', 'children'),
+               Output('sound_toggle', 'children')],
+              [Input('alarm_state', 'children'),
+               Input('reset_sound', 'n_clicks_timestamp'),
+               Input('sound_toggle', 'n_clicks_timestamp')],
+              [State('sound_state', 'children')])
+@utils.dump_func_name
+def control_audio(alarm_active, reset_ts, toggle_ts, current_state_str):
+    state = json.loads(current_state_str)
+    sound_enabled = state['sound_enabled']
+    sound_reset = state['sound_reset']
+    prev_reset_ts = state['prev_reset_ts']
+    prev_toggle_ts = state['prev_toggle_ts']
+
+    if reset_ts > prev_reset_ts:
+        sound_reset = True
+
+    if toggle_ts > prev_toggle_ts:
+        sound_enabled = not sound_enabled
+
+    if alarm_active == 'false':
+        sound_reset = False
+
+    should_play = alarm_active == 'true' and sound_enabled and not sound_reset
+
+    if should_play:
+        audio_component = html.Audio(src='/static/Howl.wav', autoPlay=True, loop=True, style={'display': 'none'})
+    else:
+        audio_component = html.Div()
+
+    new_state = {
+        'sound_enabled': sound_enabled,
+        'sound_reset': sound_reset,
+        'prev_reset_ts': reset_ts,
+        'prev_toggle_ts': toggle_ts
+    }
+
+    toggle_label = 'Sound: ON' if sound_enabled else 'Sound: OFF'
+
+    return audio_component, json.dumps(new_state), toggle_label
 
 
 app.css.append_css({
